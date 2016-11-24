@@ -337,7 +337,7 @@ end
 const BLOCK_OPS = Set(['\n', ';'])
 const BLOCK_CLOSERS = Set([SYM_END, SYM_ELSE, SYM_ELSEIF, SYM_CATCH, SYM_FINALLY])
 function parse_block(ps::ParseState, ts::TokenStream, down = parse_eq)
-    parse_Nary(ps, ts, down, BLOCK_OPS, :block, BLOCK_CLOSERS, true, true)
+    parse_Nary(ps, ts, down, BLOCK_OPS, :block, BLOCK_CLOSERS, true, false)
 end
 
 # for sequenced eval inside expressions, e.g. (a;b, c;d)
