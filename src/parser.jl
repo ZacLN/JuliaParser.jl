@@ -381,16 +381,22 @@ function parse_assignment(ps, ts, down, ex = down(ps, ts))
 end
 
 function parse_eq(ps::ParseState, ts::TokenStream)
+    start = position(ts)-length(string(¬ts.lasttoken))+1
     lno = curline(ts)
     ex = parse_assignment(ps, ts, parse_comma)
-    return short_form_function_loc(ts, ex, lno, filename(ts))
+    ex = short_form_function_loc(ts, ex, lno, filename(ts))
+    isa(ex, Expr) && ex.typ==Any && (ex.typ=start:position(ts)-1) 
+    return ex
 end
 
 # parse-eqs is used where commas are special for example in an argument list
 function parse_eqs(ps::ParseState, ts::TokenStream)
+    start = position(ts)-length(string(¬ts.lasttoken))+1
     lno = curline(ts)
     ex = parse_assignment(ps, ts, parse_cond)
-    return short_form_function_loc(ts, ex, lno, filename(ts))
+    ex = short_form_function_loc(ts, ex, lno, filename(ts))
+    isa(ex, Expr) && ex.typ==Any && (ex.typ=start:position(ts)-1)
+    return ex 
 end
 
 # parse-comma is neeed for commas outside parens, for example a = b, c
