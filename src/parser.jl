@@ -268,7 +268,7 @@ function parse_cond(ps::ParseState, ts::TokenStream)
         if ¬nt !== :(:)
             D = diag(√nt, "colon expected in \"?\" expression")
             diag(D, √t, "\"?\" was here")
-            throw(D)
+            return Expr(:error,D)
         end
         return ⨳(:if, ex, then, parse_eqs(ps, ts))
     end
@@ -282,7 +282,7 @@ function parse_Nary{T1, T2}(ps::ParseState, ts::TokenStream, down::Function, ops
     if is_invalid_initial_token(¬t)
         D = diag(√t, "unexpected \"$(¬t)\" in \"$head\" expression")
         diag(D, √opener, "expression started here")
-        throw(D)
+        return Expr(:error,D)
     end
 
     loc  = line_number_filename_node(ts) ⤄ Lexer.nullrange(ts)
@@ -304,7 +304,7 @@ function parse_Nary{T1, T2}(ps::ParseState, ts::TokenStream, down::Function, ops
     while true
         if !(¬t in ops)
             if !(Lexer.eof(t) || ¬t === '\n' || ',' in ops || ¬t in closers)
-                throw(diag(√t,"extra token \"$(¬t)\" after end of expression"))
+                return Expr(:error,diag(√t,"extra token \"$(¬t)\" after end of expression"))
             end
             if isempty(args) || length(args) >= 2 || !isfirst
                 # [] => Expr(:head)
@@ -355,7 +355,7 @@ function parse_stmts(ps::ParseState, ts::TokenStream)
     # check for unparsed junk after an expression
     t = peek_token(ps, ts)
     if !(Lexer.eof(t) || ¬t === '\n')
-        throw(diag(√t,"extra token \"$(¬t)\" after end of expression"))
+        return(Expr(:error,diag(√t,"extra token \"$(¬t)\" after end of expression")))
     end
     return ex
 end
@@ -505,17 +505,17 @@ function parse_range(ps::ParseState, ts::TokenStream)
                 end
             end
             nt = peek_token(ps, ts)
-            range_error(D) = (diag(D, √ex ⤄ √t, "start of range was here"); throw(D))
+            range_error(D) = diag(D, √ex ⤄ √t, "start of range was here")
             if is_closing_token(ps, nt)
                 # handles :(>:) case
                 if isa(ex, Symbol) && Lexer.is_operator(¬ex)
                     op = Symbol(string(ex, t))
                     Lexer.is_operator(¬op) && return op
                 end
-                range_error(diag(√nt, "missing last argument in range expression"))
+                return Expr(:error, range_error(diag(√nt, "missing last argument in range expression")))
             end
             if Lexer.isnewline(¬nt)
-                range_error(diag(√nt, "line break in \":\" expression"))
+                return Expr(:error, range_error(diag(√nt, "line break in \":\" expression")))
             end
             arg = parse_expr(ps, ts)
             if !ts.isspace && (¬arg === :(<) || ¬arg === :(>))
@@ -524,7 +524,7 @@ function parse_range(ps::ParseState, ts::TokenStream)
                 diag(D, loc,"$(¬arg):",:fixit)
                 # The user probably didn't intend a range, so don't add the
                 # range note
-                throw(D)
+                return Expr(:error,D)
             end
             if isfirst
                 ex = ⨳(t, ex, arg)
@@ -589,7 +589,7 @@ function negate(n)
     elseif isa(¬n, Expr)
         return (¬n).head === :(-) && length(n.args) == 1 ? (¬n).args[1] : ⨳(:-, n)
     end
-    throw(ArgumentError("negate argument is not a Number or Expr"))
+    return Expr(:error, ArgumentError("negate argument is not a Number or Expr"))
 end
 
 # -2^3 is parsed as -(2^3) so call parse-decl for the first arg,
@@ -601,7 +601,7 @@ function parse_unary(ps::ParseState, ts::TokenStream)
     t = require_token(ps, ts)
     if is_closing_token(ps, t)
         D = diag(√t, "unexpected \"$(¬t)\"")
-        throw(D)
+        return Expr(:error,D)
     end
     if !(isa(¬t, Symbol) && ¬t in Lexer.UNARY_OPS)
         pf = parse_factor(ps, ts)
@@ -821,11 +821,11 @@ function expect_end(ps::ParseState, ts::TokenStream, word)
     elseif Lexer.eof(t)
         D = Incomplete(:block, diag(here(ts),"incomplete: \"$(¬word)\" requires end"))
         diag(D,√word,"\"$(¬word)\" began here")
-        throw(D)
+        return Expr(:error,D)
     else
         D = diag(√t,"\"$(¬word)\" requires \"end\", got \"$(¬t)\"")
         diag(D,√word,"\"$(¬word)\" began here")
-        throw(D)
+        return Expr(:error,D)
     end
 end
 
@@ -894,12 +894,12 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
 
             elseif ¬word === :if || ¬word == :elseif
                 if chain == nothing && ¬word == :elseif
-                    throw(diag(√word,"\"elseif\" without preceeding if"))
+                    return Expr(:error, diag(√word,"\"elseif\" without preceeding if"))
                 end
                 if Lexer.isnewline(¬peek_token(ps, ts))
                     D = diag(√word, "missing condition in \"$(¬word)\"")
                     diag(D, √chain, "previous \"$(¬chain)\" was here")
-                    throw(D)
+                    return Expr(:error,D)
                 end
                 test = parse_cond(ps, ts)
                 t    = require_token(ps, ts)
@@ -918,7 +918,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                         loc = √nxt ⤄ √nnxt
                         D = diag(loc, "use \"elseif\" instead of \"else if\"")
                         diag(D, loc, "elseif", :fixit)
-                        throw(D)
+                        return Expr(:error,D)
                     end
                     blk = parse_block(ps, ts)
                     ex = ⨳(:if, test, then, blk) ⤄ word
@@ -927,7 +927,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                 else
                     D = diag(√nxt,"Unexpected \"$(¬nxt)\" in if expression")
                     diag(D, √word, "previous \"$(¬word)\" was here")
-                    throw(D)
+                    return Expr(:error,D)
                 end
 
             elseif ¬word === :let
@@ -938,7 +938,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                 if !(Lexer.eof(nt) || (isa(¬nt, CharSymbol) && (¬nt === '\n' || ¬nt ===  ';' || ¬nt === SYM_END)))
                     D = diag(√nt, "let variables should end in \";\" or newline")
                     diag(D, √word, "\"let\" was here")
-                    throw(D)
+                    return Expr(:error,D)
                 end
                 ex = parse_block(ps, ts)
                 expect_end(ps, ts, word)
@@ -980,7 +980,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                     else
                         D = diag(after(√sig), "expected \"(\" in $(¬word) definition")
                         diag(D, √word, "\"$(¬word)\" was here")
-                        throw(D)
+                        return Expr(:error,D)
                     end
                 end
                 ¬peek_token(ps, ts) !== SYM_END && Lexer.skipws_and_comments(ts)
@@ -1004,7 +1004,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                 if ¬nxt in Lexer.RESERVED_WORDS
                     D = diag(√nxt, "invalid type name \"$(¬nxt)\"")
                     diag(D, √word, "$(¬word) was here")
-                    throw(D)
+                    return Expr(:error,D)
                 end
                 sig = parse_subtype_spec(ps, ts)
                 blk = parse_block(ps, ts)
@@ -1084,7 +1084,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                     else
                         D = diag(√t,"Unexpected \"$(¬t)\" in try expression")
                         diag(D, √word, "\"$(¬word)\" was here")
-                        throw(D)
+                        return Expr(:error,D)
                     end
                 end
 
@@ -1102,7 +1102,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                                           (¬assgn).head === :local))
                     D = diag(√assgn, "expected assignment after \"$(¬word)\"")
                     diag(D, √word, "\"$(¬word)\" was here")
-                    throw(D)
+                    return Expr(:error,D)
                 end
                 return ⨳(:const, assgn)
 
@@ -1120,7 +1120,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                     if !is_symbol_or_interpolate(x)
                         D = diag(√x, "invalid literal \"$(¬x)\" in \"$(¬word)\" statement")
                         diag(D, √word, "\"$(¬word)\" was here")
-                        throw(D)
+                        return Expr(:error,D)
                     end
                 end
                 ex = ⨳(word) ⪥ exports
@@ -1135,7 +1135,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
             elseif ¬word === :ccall
                 nt = peek_token(ps, ts)
                 if ¬nt != '('
-                    throw(diag(√nt,"Expected '('"))
+                    return Expr(:error, diag(√nt,"Expected '('"))
                 end
                 take_token(ts)
                 al = parse_arglist(ps, ts, ')', nt)
@@ -1158,7 +1158,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
 
             else
                 @assert ¬word === :do
-                throw(diag(√word,"invalid \"$(¬word)\" syntax"))
+                return Expr(:error, diag(√word,"invalid \"$(¬word)\" syntax"))
             end
         end
     end
@@ -1316,7 +1316,7 @@ function parse_iteration_spec(ps, ts, word)
     else
         D = diag(√lhs, "invalid iteration spec")
         diag(D, √word, "for this `for`")
-        throw(D)
+        return Expr(:error,D)
     end
 end
 
@@ -1382,9 +1382,9 @@ function _parse_arglist(ps::ParseState, ts::TokenStream, closer, opener)
         nxt = try
             parse_eqs(ps, ts)
         catch D
-            isa(D, Diagnostic) || rethrow(D)
+            isa(D, Diagnostic) || return Expr(:error, D)
             diag(D, √opener, "in argument list beginning here")
-            throw(D)
+            return Expr(:error,D)
         end
         loc = here(ts)
         nt  = require_token(ps, ts)
@@ -1405,7 +1405,7 @@ function _parse_arglist(ps::ParseState, ts::TokenStream, closer, opener)
         else
             D = diag(loc,"Expected '$(¬closer)' or ','")
             diag(D, √opener, "to match '$(¬opener)' here", :note)
-            throw(D)
+            return Expr(:error,D)
         end
     end
 end
@@ -1450,11 +1450,11 @@ function parse_vect(ps::ParseState, ts::TokenStream, frst, closer, opener)
         elseif ¬t === ']' || ¬t === '}'
             D = diag(√t, "Expected \"$closer\", got \"$(¬t)\"")
             diag(D, √opener, "Expression began here")
-            throw(D)
+            return Expr(:error,D)
         else
             D = diag(√t,"missing separator in array expression")
             diag(D, √opener, "Expression began here")
-            throw(D)
+            return Expr(:error,D)
         end
     end
 end
@@ -1464,7 +1464,7 @@ function parse_dict(ps::ParseState, ts::TokenStream, frst, closer, opener)
     v = parse_vect(ps, ts, frst, closer, opener)
     for arg in collect(children(v))
         alldl = is_dict_literal(¬arg)
-        alldl || throw(diag(√arg,"invalid dict literal"))
+        alldl || return Expr(:error, diag(√arg,"invalid dict literal"))
     end
     return ⨳(:dict) ⪥ v
 end
@@ -1479,7 +1479,7 @@ function parse_comprehension(ps::ParseState, ts::TokenStream, frst, closer, open
     if ¬t !== closer
         D = diag(√t,"expected '$closer' not \"$(¬t)\"")
         diag(D, √opener, "in comprehension that began here")
-        throw(D)
+        return Expr(:error,D)
     end
     take_token(ts)
     if VERSION >= v"0.5-"
@@ -1496,7 +1496,7 @@ function parse_dict_comprehension(ps::ParseState, ts::TokenStream, frst, closer,
         ex = ⨳(:dict_comprehension) ⪥ c
         return ex
     else
-        throw(diag(√(first(children(args))),"non-dict-literal in dict comprehension"))
+        return Expr(:error, diag(√(first(children(args))),"non-dict-literal in dict comprehension"))
     end
 end
 
@@ -1516,7 +1516,7 @@ function parse_matrix(ps::ParseState, ts::TokenStream, frst, closer, gotnewline,
 
     function report_error(D)
         diag(D, √opener, "In matrix expression that began here")
-        throw(D)
+        return Expr(:error,D)
     end
 
     semicolon = ¬peek_token(ps, ts) === ';'
@@ -1673,17 +1673,17 @@ end
 
 # TODO: these are unnecessary if base/client.jl didn't need to parse error string
 function not_eof_1(ts)
-    Lexer.eof(ts) && throw(Incomplete(:char, diag(here(ts),"incomplete: invalid character literal")))
+    Lexer.eof(ts) && return Expr(:error, Incomplete(:char, diag(here(ts),"incomplete: invalid character literal")))
     return Lexer.readchar(ts)
 end
 
 function not_eof_2(ts)
-    Lexer.eof(ts) && throw(Incomplete(:cmd, diag(here(ts),"incomplete: invalid \"`\" literal")))
+    Lexer.eof(ts) && return Expr(:error, Incomplete(:cmd, diag(here(ts),"incomplete: invalid \"`\" literal")))
     return Lexer.readchar(ts)
 end
 
 function not_eof_3(ts)
-    Lexer.eof(ts) && throw(Incomplete(:string, diag(here(ts),"incomplete: invalid string syntax")))
+    Lexer.eof(ts) && return Expr(:error, Incomplete(:string, diag(here(ts),"incomplete: invalid string syntax")))
     return Lexer.readchar(ts)
 end
 
@@ -1714,10 +1714,10 @@ end
 function parse_interpolate(ps::ParseState, ts::TokenStream, start, srange)
     c = Lexer.peekchar(ts)
     function report_error(D)
-        !isa(D, Diagnostic) && rethrow(D)
+        !isa(D, Diagnostic) && return Expr(:error,D)
         diag(D, √start, "In interpolation syntax starting here")
         diag(D, srange, "In string expression beginning here")
-        throw(D)
+        return Expr(:error,D)
     end
     if Lexer.is_identifier_char(c)
         try
@@ -1746,7 +1746,7 @@ function tostr(buf::IOBuffer, custom::Bool)
     custom && return str
     str = unescape_string(str)
     if !(@compat isvalid(String,str))
-        throw(diag(√str,"string contains invalid UTF8 sequence"))
+        return Expr(:error, diag(√str,"string contains invalid UTF8 sequence"))
     end
    return str
 end
@@ -1901,7 +1901,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
         take_token(ts)
         r = Lexer.startrange(ts)
         fch = not_eof_1(ts)
-        fch === '\'' && throw(diag(Lexer.makerange(ts,r)⤄√t,"empty char literal not allowed"))
+        fch === '\'' && return Expr(:error, diag(Lexer.makerange(ts,r)⤄√t,"empty char literal not allowed"))
         if fch !== '\\' && !Lexer.eof(fch) && Lexer.peekchar(ts) === '\''
             # easy case 1 char no \
             Lexer.takechar(ts)
@@ -1922,7 +1922,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
                 return str[1] ⤄ Lexer.makerange(ts, r)
             else
                 if length(str) != 1  || !is_valid_utf8(str)
-                    throw(diag(Lexer.makerange(ts,r)⤄√t,
+                    return Expr(:error, diag(Lexer.makerange(ts,r)⤄√t,
                         "invalid character literal, got \'$str\'"))
                 end
                 return str[1] ⤄ Lexer.makerange(ts, r)
@@ -1940,7 +1940,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
 
     # misplaced =
     elseif ¬t === :(=)
-        throw(diag(√t,"unexpected \"$(¬t)\""))
+        return Expr(:error, diag(√t,"unexpected \"$(¬t)\""))
 
     # identifier
     elseif isa(¬t, Symbol)
@@ -1962,7 +1962,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
                     # cause an invalid identifier name
                     t = take_token(ts)
                     nt = require_token(ps, ts)
-                    ¬nt !== ')' && throw(diag(after(√t),"Expected ')'"))
+                    ¬nt !== ')' && return Expr(:error, diag(after(√t),"Expected ')'"))
                     take_token(ts)
                     return t
                 elseif ¬rt === ';'
@@ -1992,7 +1992,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
                         if ¬tok !== ')'
                             D = diag(√tok,"Expected ')'")
                             diag(D,√t,"to match '$(¬t)' here")
-                            throw(D)
+                            return Expr(:error, D)
                         end
                         take_token(ts)
                         return gen
@@ -2002,7 +2002,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
                         elseif ¬nt !== ';'
                             D = diag(before(nt), "Expected ',' or ')'")
                             diag(D,√t,"to match '$(¬t)' here")
-                            throw(D)
+                            return Expr(:error, D)
                         end
                         res = arglist_to_tuple(ts, false, ¬nt == ',',
                             parse_arglist(ps, ts, ')', t), (ex,))
@@ -2068,14 +2068,14 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
         return parse_backquote(ps, ts)
 
     else
-        throw(diag(√t,"invalid syntax: \"$(¬take_token(ts))\""))
+        return Expr(:error, diag(√t,"invalid syntax: \"$(¬take_token(ts))\""))
     end
 end
 
 function parse_atom(ps::ParseState, ts::TokenStream)
     ex = _parse_atom(ps, ts)
     if (¬ex !== :(=>) && (¬ex in Lexer.SYNTACTIC_OPS)) || ¬ex === :(...)
-        throw(diag(√ex, "invalid identifier name \"$(¬ex)\""))
+        return Expr(:error, diag(√ex, "invalid identifier name \"$(¬ex)\""))
     end
     return ex
 end
@@ -2100,7 +2100,7 @@ function macroify_name(ex)
         args = collect(children(ex))
         return ⨳(:(.), args[1], macroify_name(args[2]))
     else
-        throw(diag(√ex,"invalid macro use \"@($(¬ex))\""))
+        return Expr(:error, diag(√ex,"invalid macro use \"@($(¬ex))\""))
     end
 end
 
