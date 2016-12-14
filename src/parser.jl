@@ -681,11 +681,16 @@ end
 # parse function all, indexing, dot, and transpose expressions
 # also handles looking for reserved words
 function parse_call(ps::ParseState, ts::TokenStream)
+    start = position(ts)-length(string(¬ts.lasttoken))+1
     ex = parse_unary_prefix(ps, ts)
     if isa(¬ex, Symbol) && ¬ex in Lexer.RESERVED_WORDS
-        return parse_resword(ps, ts, ex)
+        ret = parse_resword(ps, ts, ex)
+        isa(ret, Expr) && ret.typ==Any && (ret.typ=start:position(ts)-1)
+        return ret
     end
-    return parse_call_chain(ps, ts, ex, false)
+    ret = parse_call_chain(ps, ts, ex, false)
+    isa(ret, Expr) && ret.typ==Any && (ret.typ=start:position(ts)-1)
+    return ret
 end
 
 function separate(f::Function, collection)
