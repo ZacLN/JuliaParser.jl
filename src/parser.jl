@@ -258,6 +258,7 @@ function parse_RtoL{T}(ps::ParseState, ts::TokenStream, down::Function, ops::Set
 end
 
 function parse_cond(ps::ParseState, ts::TokenStream)
+    start = position(ts)-length(string(¬ts.lasttoken))+1
     ex = (VERSION < v"0.4.0-dev+573" ? parse_or : parse_arrow)(ps, ts)
     if ¬peek_token(ps, ts) === :(?)
         t = take_token(ts)
@@ -270,8 +271,11 @@ function parse_cond(ps::ParseState, ts::TokenStream)
             diag(D, √t, "\"?\" was here")
             return Expr(:error,D)
         end
-        return ⨳(:if, ex, then, parse_eqs(ps, ts))
+        ret = ⨳(:if, ex, then, parse_eqs(ps, ts))
+        isa(ret, Expr) && ret.typ==Any && (ret.typ=start:position(ts)-1)
+        return ret
     end
+    isa(ex, Expr) && ex.typ==Any && (ex.typ=start:position(ts)-1)
     return ex
 end
 
