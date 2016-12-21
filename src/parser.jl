@@ -957,7 +957,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                 ex = parse_block(ps, ts)
                 expect_end(ps, ts, word)
                 # Don't need line number node in empty let blocks
-                length((¬ex).args) == 1 && (ex = ⨳(:block) ⤄ ex)
+                # length((¬ex).args) == 1 && (ex = ⨳(:block) ⤄ ex)
                 ex = ⨳(:let, ex) ⪥ binds
                 return ex
 
