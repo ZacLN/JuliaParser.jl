@@ -957,7 +957,7 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                 ex = parse_block(ps, ts)
                 expect_end(ps, ts, word)
                 # Don't need line number node in empty let blocks
-                length((¬ex).args) == 1 && (ex = ⨳(:block) ⤄ ex)
+                # length((¬ex).args) == 1 && (ex = ⨳(:block) ⤄ ex)
                 ex = ⨳(:let, ex) ⪥ binds
                 return ex
 
@@ -1722,7 +1722,7 @@ function parse_backquote(ps::ParseState, ts::TokenStream)
         continue
     end
     return ⨳(:macrocall, Symbol("@cmd") ⤄ Lexer.nullrange(ts),
-        takebuf_string(buf) ⤄ Lexer.makerange(ts, r))
+        String(take!(buf)) ⤄ Lexer.makerange(ts, r))
 end
 
 function parse_interpolate(ps::ParseState, ts::TokenStream, start, srange)
@@ -1756,7 +1756,7 @@ function parse_interpolate(ps::ParseState, ts::TokenStream, start, srange)
 end
 
 function tostr(buf::IOBuffer, custom::Bool)
-    str = takebuf_string(buf)
+    str = String(take!(buf))
     custom && return str
     str = unescape_string(str)
     if !(@compat isvalid(String,str))
@@ -1874,7 +1874,7 @@ end
 function dedent_triple_quoted_string(mstr)
     # Compute longest common prefix of ' ' and '\t'
     els = filter(x->!isempty(x),
-        map(str->collect(drop(EachLine(IOBuffer(¬str)), 1)),
+        map(str->collect(Iterators.drop(EachLine(IOBuffer(¬str)), 1)),
         filter(x->isa(¬x, AbstractString), children(mstr))))
     isempty(els) && return drop_leading_newline(mstr)
     # Shortcur if the closing """ is at the beginning of the line
@@ -1928,8 +1928,8 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
                 c === '\\' && write(b, not_eof_1(ts))
                 c = not_eof_1(ts)
                 continue
-            end
-            str = unescape_string(takebuf_string(b))
+            end            
+            str = unescape_string(String(take!(b)))
             if length(str) == 1
                 # one byte e.g. '\xff' maybe not valid UTF-8
                 # but we want to use the raw value as a codepoint in this case
