@@ -31,10 +31,10 @@ end
 
 function getindex(file::SourceFile, line::Int)
     if line == length(file.offsets)
-        return file.data[(file.offsets[end]+1):end]
+        return Vector{UInt8}(file)[(file.offsets[end]+1):end]
     else
         # - 1 to skip the '\n'
-        return file.data[(file.offsets[line]+1):(file.offsets[line+1]-1)]
+        return Vector{UInt8}(file)[(file.offsets[line]+1):(file.offsets[line+1]-1)]
     end
 end
 getindex(file::SourceFile, arr::AbstractArray) = [file[x] for x in arr]

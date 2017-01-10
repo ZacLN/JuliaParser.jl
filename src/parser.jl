@@ -1854,9 +1854,9 @@ function parse_string_literal(ps::ParseState, ts::TokenStream, custom)
 end
 
 function longest_common_prefix(prefixa, prefixb)
-    maxplength = min(length(prefixa.data), length(prefixb.data))
+    maxplength = min(sizeof(prefixa), sizeof(prefixb))
     maxplength == 0 && return ""
-    idx = findfirst(i->(prefixa.data[i] != prefixb.data[i]),1:maxplength)
+    idx = findfirst(i->(Vector{UInt8}(prefixa)[i] != Vector{UInt8}(prefixb)[i]),1:maxplength)
     idx = idx == 0 ? maxplength : idx - 1
     prefixa[1:idx]
 end
