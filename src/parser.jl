@@ -1143,9 +1143,11 @@ function parse_resword(ps::ParseState, ts::TokenStream, word, chain = nothing)
                 return ex
 
             elseif ¬word === :import || ¬word === :using || ¬word === :importall
+                start = position(ts)-length(string(¬ts.lasttoken))+1
                 imports = parse_imports(ps, ts, word)
                 length(imports) == 1 && return imports[1]
                 ex = (⨳(:toplevel) ⤄ Lexer.nullrange(ts)) ⪥ imports
+                isa(ex, Expr) && ex.typ==Any && (ex.typ=start:position(ts)-1)
                 return ex
 
             elseif ¬word === :ccall
