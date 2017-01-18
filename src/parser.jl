@@ -1463,8 +1463,8 @@ function parse_vect(ps::ParseState, ts::TokenStream, frst, closer, opener)
         elseif ¬t === ';'
             head = :vcat
             ¬require_token(ps, ts) === closer && continue
-            return ((⨳(:vcat) ⪥ parse_arglist(ps, ts, closer, opener)) ⪥ reverse!(list)) ⪥
-                (next,)
+            return ((⨳(:vcat) ⪥ parse_arglist(ps, ts, closer, opener)) ⪥ reverse!(lst)) ⪥
+                (nxt,)
         elseif ¬t === ']' || ¬t === '}'
             D = diag(√t, "Expected \"$closer\", got \"$(¬t)\"")
             diag(D, √opener, "Expression began here")
@@ -1932,7 +1932,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
                 c === '\\' && write(b, not_eof_1(ts))
                 c = not_eof_1(ts)
                 continue
-            end            
+            end
             str = unescape_string(String(take!(b)))
             if length(str) == 1
                 # one byte e.g. '\xff' maybe not valid UTF-8

@@ -417,7 +417,7 @@ facts("test function return tuple") do
             """,
             """
             # from Iterators.jl parse failure
-            function next(it::Take, state)
+            function next(it::Iterators.Take, state)
                 n, xs_state = state
                 v, xs_state = next(it.xs, xs_state)
                 return v, (n - 1, xs_state)
@@ -1021,4 +1021,10 @@ facts("misc syntax changes") do
     for ex in exprs
         @fact (Parser.parse(ex) |> norm_ast) --> (Base.parse(ex) |> norm_ast)
     end
+end
+
+#issue 72
+facts("parse an incorrectly specified vector") do
+    str = "[1,2;3]"
+    @fact Parser.parse(str) --> Base.parse(str)
 end
