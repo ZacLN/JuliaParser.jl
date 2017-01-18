@@ -1360,7 +1360,7 @@ end
 
 function to_kws(lst)
     n = length(lst)
-    kwargs = Array(Any, n)
+    kwargs = Array{Any}(n)
     for i = 1:n
         ex = lst[i]
         if isa(¬ex, Expr) && (¬ex).head === :(=) && length((¬ex).args) == 2
@@ -1463,8 +1463,8 @@ function parse_vect(ps::ParseState, ts::TokenStream, frst, closer, opener)
         elseif ¬t === ';'
             head = :vcat
             ¬require_token(ps, ts) === closer && continue
-            return ((⨳(:vcat) ⪥ parse_arglist(ps, ts, closer, opener)) ⪥ reverse!(list)) ⪥
-                (next,)
+            return ((⨳(:vcat) ⪥ parse_arglist(ps, ts, closer, opener)) ⪥ reverse!(lst)) ⪥
+                (nxt,)
         elseif ¬t === ']' || ¬t === '}'
             D = diag(√t, "Expected \"$closer\", got \"$(¬t)\"")
             diag(D, √opener, "Expression began here")
@@ -1726,7 +1726,7 @@ function parse_backquote(ps::ParseState, ts::TokenStream)
         continue
     end
     return ⨳(:macrocall, Symbol("@cmd") ⤄ Lexer.nullrange(ts),
-        takebuf_string(buf) ⤄ Lexer.makerange(ts, r))
+        String(take!(buf)) ⤄ Lexer.makerange(ts, r))
 end
 
 function parse_interpolate(ps::ParseState, ts::TokenStream, start, srange)
@@ -1760,7 +1760,7 @@ function parse_interpolate(ps::ParseState, ts::TokenStream, start, srange)
 end
 
 function tostr(buf::IOBuffer, custom::Bool)
-    str = takebuf_string(buf)
+    str = String(take!(buf))
     custom && return str
     str = unescape_string(str)
     if !(@compat isvalid(String,str))
@@ -1933,7 +1933,7 @@ function _parse_atom(ps::ParseState, ts::TokenStream)
                 c = not_eof_1(ts)
                 continue
             end
-            str = unescape_string(takebuf_string(b))
+            str = unescape_string(String(take!(b)))
             if length(str) == 1
                 # one byte e.g. '\xff' maybe not valid UTF-8
                 # but we want to use the raw value as a codepoint in this case
