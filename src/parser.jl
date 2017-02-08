@@ -362,7 +362,7 @@ function parse_stmts(ps::ParseState, ts::TokenStream)
     # check for unparsed junk after an expression
     t = peek_token(ps, ts)
     if !(Lexer.eof(t) || ¬t === '\n')
-        return(Expr(:error,diag(√t,"extra token \"$(¬t)\" after end of expression")))
+        return Expr(:error,diag(√t,"extra token \"$(¬t)\" after end of expression"))
     end
     return ex
 end
@@ -1563,13 +1563,13 @@ function parse_matrix(ps::ParseState, ts::TokenStream, frst, closer, gotnewline,
             vec   = Any[]
             continue
         elseif ¬t === ',' || ¬t === ']' || ¬t === '}'
-            report_error(diag(√t,"unexpected \"$(¬t)\" in matrix expression"))
+            return report_error(diag(√t,"unexpected \"$(¬t)\" in matrix expression"))
         elseif ¬t === :for
             if !semicolon && length(outer) == 1 && isempty(vec)
                 take_token(ts)
                 return parse_comprehension(ps, ts, outer[1], closer, opener, t)
             else
-                report_error(diag(√t,"invalid comprehension syntax"))
+                return report_error(diag(√t,"invalid comprehension syntax"))
             end
         else
             push!(vec, parse_eqs(ps, ts))
@@ -1751,11 +1751,11 @@ function parse_interpolate(ps::ParseState, ts::TokenStream, start, srange)
             report_error(err)
         end
         nt = require_token(ps, ts)
-        ¬nt !== ')' && report_error(diag(√nt, "Expected ')'"))
+        ¬nt !== ')' && return report_error(diag(√nt, "Expected ')'"))
         take_token(ts)
         return ex
     else
-        report_error(diag(here(ts),"invalid interpolation syntax: \"$c\""))
+        return report_error(diag(here(ts),"invalid interpolation syntax: \"$c\""))
     end
 end
 
